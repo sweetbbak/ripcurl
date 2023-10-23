@@ -7,6 +7,7 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	"io"
 	"net/http"
+	urlx "net/url"
 	"os"
 	"regexp"
 	"strings"
@@ -126,6 +127,11 @@ func parse_stdin() {
 }
 
 func process_url(url string) {
+	u, err := urlx.ParseRequestURI(url)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(u)
 	resp, err := request(url)
 	if err != nil {
 		fmt.Println(err)
@@ -168,6 +174,7 @@ func init() {
 	flag.BoolVar(&helpBool, "h", false, "Print help")
 }
 
+// TODO change url variable to something else to avoid net/url conflict
 func main() {
 	flag.Parse()
 
@@ -187,13 +194,15 @@ func main() {
 	// try to infer if the action was to pipe data in
 	if stdin_bool == true && stdin_open == true {
 		parse_stdin()
-	} else if stdin_open == true && url == "" {
+	}
+	if stdin_open == true && url == "" {
 		parse_stdin()
 	}
 
 	if url != "" {
 		process_url(url)
-	} else {
+		os.Exit(0)
+	} else if url == "" && stdin_open == false && stdin_bool == false {
 		fmt.Println("Input url or pipe in HTML")
 		print_help()
 		os.Exit(1)
