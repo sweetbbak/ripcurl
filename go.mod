@@ -1,4 +1,4 @@
-module url2tts
+module ripcurl
 
 go 1.21.3
 
