@@ -18,11 +18,11 @@ var usage = `Usage:
 	-u --url
 	-s --stdin
 Operations:
-	reader --url <url> -o
+	ripcurl --url <url>
 Examples:
-	reader --url <url> -o out.txt
-	reader --url <url> | bat
-	curl -fsSl <url> | reader | bat
+	ripcurl --url <url> > out.txt
+	ripcurl --url <url> | bat
+	curl -fsSl <url> | ripcurl | bat
 	`
 
 func print_help() {
@@ -101,11 +101,10 @@ func parse_doc_ptag_custom(doc *goquery.Document, tag ...string) []string {
 	return text
 }
 
-func request(url string) (*http.Response, error) {
+func request(url string, ua ...string) (*http.Response, error) {
 	// create cloudflare resistent client
 	cl := tls_client()
 	req, err := http.NewRequest("GET", url, nil)
-	// req.Header.Add("User-Agent", `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.27 Safari/537.36`)
 	req.Header.Add("User-Agent", `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.27 Safari/537.36`)
 
 	resp, err := cl.Do(req)
@@ -141,28 +140,35 @@ func process_url(url string) {
 	}
 }
 
-func main() {
-	var url string
+var user_agentx = `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.27 Safari/537.36`
+
+var (
+	url        string
+	user_agent string
+	stdin_bool bool
+	pstdout    bool
+	helpBool   bool
+)
+
+func init() {
 	flag.StringVar(&url, "url", "", "Url to request")
 	flag.StringVar(&url, "u", "", "Url to request")
 
 	var user_agentx = `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.27 Safari/537.36`
-	var user_agent string
 	flag.StringVar(&user_agent, "user-agent", user_agentx, "user agent to use")
 	flag.StringVar(&user_agent, "U", user_agentx, "user agent to use")
 
-	var stdin_bool bool
 	flag.BoolVar(&stdin_bool, "stdin", false, "Read HTML from Stdin ie curl xyz.io | bin")
 	flag.BoolVar(&stdin_bool, "s", false, "Read HTML from Stdin ie curl xyz.io | bin")
 
-	var pstdout bool
 	flag.BoolVar(&pstdout, "out", false, "Print to stdout")
 	flag.BoolVar(&pstdout, "o", false, "Print to stdout")
 
-	var helpBool bool
 	flag.BoolVar(&helpBool, "help", false, "Print help")
 	flag.BoolVar(&helpBool, "h", false, "Print help")
+}
 
+func main() {
 	flag.Parse()
 
 	if helpBool == true {
@@ -170,17 +176,27 @@ func main() {
 		os.Exit(0)
 	}
 
-	if url == "" && stdin_bool == false {
+	stdin_open := is_stdin_open()
+
+	if url == "" && stdin_bool == false && stdin_open == false {
 		print_help()
 		os.Exit(0)
 	}
 
-	if is_stdin_open() == true && url == "" {
+	// explicitly check flag and stdin or
+	// try to infer if the action was to pipe data in
+	if stdin_bool == true && stdin_open == true {
+		parse_stdin()
+	} else if stdin_open == true && url == "" {
 		parse_stdin()
 	}
 
 	if url != "" {
 		process_url(url)
+	} else {
+		fmt.Println("Input url or pipe in HTML")
+		print_help()
+		os.Exit(1)
 	}
 
 }
