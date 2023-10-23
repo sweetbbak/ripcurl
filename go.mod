@@ -1,4 +1,4 @@
-module ripcurl
+module github.com/sweetbbak/ripcurl
 
 go 1.21.3
 
