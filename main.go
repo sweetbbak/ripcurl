@@ -15,14 +15,16 @@ import (
 )
 
 var usage = `Usage:
-	-h --help
-	-u --url
-	-s --stdin
+	-h --help      show this help message
+	-u --url       url to fetch
+	-s --stdin     read from stdin
+	-t --tts       command to use to play TTS from a file
 Operations:
 	ripcurl --url <url>
 Examples:
 	ripcurl --url <url> > out.txt
 	ripcurl --url <url> | bat
+	ripcurl --url <url> --tts "amy -f"
 	curl -fsSl <url> | ripcurl | bat
 	`
 
@@ -126,7 +128,7 @@ func parse_stdin() {
 	}
 }
 
-func process_url(url string) {
+func process_url(url string) []string {
 	u, err := urlx.ParseRequestURI(url)
 	if err != nil {
 		panic(err)
@@ -141,9 +143,10 @@ func process_url(url string) {
 	lines := parse_doc_ptag(doc)
 	lines = clean_text(lines)
 
-	for x := range lines {
-		fmt.Println(lines[x])
-	}
+	// for x := range lines {
+	// 	fmt.Println(lines[x])
+	// }
+	return lines
 }
 
 var user_agentx = `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.27 Safari/537.36`
@@ -154,6 +157,7 @@ var (
 	stdin_bool bool
 	pstdout    bool
 	helpBool   bool
+	command    string
 )
 
 func init() {
@@ -169,6 +173,9 @@ func init() {
 
 	flag.BoolVar(&pstdout, "out", false, "Print to stdout")
 	flag.BoolVar(&pstdout, "o", false, "Print to stdout")
+
+	flag.StringVar(&command, "tts", "", "command to use to play text with TTS")
+	flag.StringVar(&command, "t", "", "command to use to play text with TTS")
 
 	flag.BoolVar(&helpBool, "help", false, "Print help")
 	flag.BoolVar(&helpBool, "h", false, "Print help")
@@ -200,7 +207,11 @@ func main() {
 	}
 
 	if url != "" {
-		process_url(url)
+		lines := process_url(url)
+		if command != "" {
+			text := strings.Join(lines, " ")
+			startTTS(text, command)
+		}
 		os.Exit(0)
 	} else if url == "" && stdin_open == false && stdin_bool == false {
 		fmt.Println("Input url or pipe in HTML")
