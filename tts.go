@@ -80,7 +80,7 @@ func startTTS(t string, c string) {
 	tmp.Write([]byte(t))
 	tmp.Close()
 	// cmd := strings.ReplaceAll(command, "{{file}}", tmp.Name())
-	// defer os.Remove(tmp.Name())
+	defer os.Remove(tmp.Name())
 
 	out := exec.Command("balcon", "-i", "-n", "Amy")
 	out.Env = os.Environ()
@@ -108,9 +108,6 @@ func tts_stdin(t string, c string) {
 
 	cmd := strings.Split(command, " ")
 	out := exec.Command(cmd[0], cmd[1:]...)
-
-	// fmt.Println("Command: ", command)
-	// fmt.Println("exec: ", cmd)
 
 	out.Env = os.Environ()
 	p, err := out.StdinPipe()
