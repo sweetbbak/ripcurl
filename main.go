@@ -108,7 +108,8 @@ func request(url string, ua ...string) (*http.Response, error) {
 	// create cloudflare resistent client
 	cl := tls_client()
 	req, err := http.NewRequest("GET", url, nil)
-	req.Header.Add("User-Agent", `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.27 Safari/537.36`)
+	// req.Header.Add("User-Agent", `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.27 Safari/537.36`)
+	req.Header.Add("User-Agent", user_agent)
 
 	resp, err := cl.Do(req)
 	if err != nil {
@@ -117,15 +118,13 @@ func request(url string, ua ...string) (*http.Response, error) {
 	return resp, err
 }
 
-func parse_stdin() {
+func parse_stdin() []string {
 	a := bufio.NewReader(os.Stdin)
 	doc := create_doc(a)
 	lines := parse_doc_ptag(doc)
 	lines = clean_text(lines)
 
-	for x := range lines {
-		fmt.Println(lines[x])
-	}
+	return lines
 }
 
 func process_url(url string) []string {
@@ -143,9 +142,6 @@ func process_url(url string) []string {
 	lines := parse_doc_ptag(doc)
 	lines = clean_text(lines)
 
-	// for x := range lines {
-	// 	fmt.Println(lines[x])
-	// }
 	return lines
 }
 
@@ -156,11 +152,29 @@ var (
 	user_agent string
 	stdin_bool bool
 	pstdout    bool
+	ttsbool    bool
 	helpBool   bool
 	command    string
+	configPath string
 )
 
+func isFlagPassed(name string) bool {
+	found := false
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == name {
+			found = true
+		}
+	})
+	return found
+}
+
 func init() {
+	// confp, err := os.UserConfigDir()
+	// if err != nil {
+	// 	fmt.Println(err)
+	// }
+	// configPath = confp + "/ripcurl.conf"
+
 	flag.StringVar(&url, "url", "", "Url to request")
 	flag.StringVar(&url, "u", "", "Url to request")
 
@@ -168,17 +182,34 @@ func init() {
 	flag.StringVar(&user_agent, "user-agent", user_agentx, "user agent to use")
 	flag.StringVar(&user_agent, "U", user_agentx, "user agent to use")
 
-	flag.BoolVar(&stdin_bool, "stdin", false, "Read HTML from Stdin ie curl xyz.io | bin")
-	flag.BoolVar(&stdin_bool, "s", false, "Read HTML from Stdin ie curl xyz.io | bin")
-
 	flag.BoolVar(&pstdout, "out", false, "Print to stdout")
 	flag.BoolVar(&pstdout, "o", false, "Print to stdout")
 
-	flag.StringVar(&command, "tts", "", "command to use to play text with TTS")
-	flag.StringVar(&command, "t", "", "command to use to play text with TTS")
+	flag.StringVar(&command, "tts", "default", "command to use to play text with TTS")
+	flag.BoolVar(&ttsbool, "t", false, "Use default TTS command to play TTS")
 
 	flag.BoolVar(&helpBool, "help", false, "Print help")
 	flag.BoolVar(&helpBool, "h", false, "Print help")
+
+	flag.StringVar(&configPath, "config", "ripcurl.conf", "Path to config file")
+	flag.StringVar(&configPath, "c", "ripcurl.conf", "Path to config file")
+}
+
+func parse_config() {
+	config, err := NewConfig(configPath)
+	if err != nil {
+		fmt.Println(err)
+	}
+	// config.String("xyz")
+	command = config.String("stdin::cmd")
+}
+
+func parse_config2(cmd string) {
+	config, err := NewConfig(configPath)
+	if err != nil {
+		fmt.Println(err)
+	}
+	command = config.String(cmd)
 }
 
 // TODO change url variable to something else to avoid net/url conflict
@@ -192,18 +223,29 @@ func main() {
 
 	stdin_open := is_stdin_open()
 
-	if url == "" && stdin_bool == false && stdin_open == false {
+	if url == "" && stdin_open == false {
 		print_help()
 		os.Exit(0)
 	}
 
-	// explicitly check flag and stdin or
-	// try to infer if the action was to pipe data in
-	if stdin_bool == true && stdin_open == true {
-		parse_stdin()
-	}
 	if stdin_open == true && url == "" {
-		parse_stdin()
+		lines := parse_stdin()
+		text := strings.Join(lines, " ")
+		for x := range lines {
+			fmt.Fprintln(os.Stdout, lines[x])
+		}
+
+		if isFlagPassed("tts") || ttsbool == true {
+			c := command
+			if c == "" || c == "default" {
+				// sets global command as stdin::cmd
+				parse_config2("stdin::cmd")
+			} else {
+				parse_config2(command)
+			}
+			tts_stdin(text, command)
+		}
+		os.Exit(0)
 	}
 
 	if url != "" {
