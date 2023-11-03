@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	md "github.com/JohannesKaufmann/html-to-markdown"
 	"github.com/PuerkitoBio/goquery"
 	"io"
 	"net/http"
@@ -148,14 +149,15 @@ func process_url(url string) []string {
 var user_agentx = `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.27 Safari/537.36`
 
 var (
-	url        string
-	user_agent string
-	stdin_bool bool
-	pstdout    bool
-	ttsbool    bool
-	helpBool   bool
-	command    string
-	configPath string
+	url           string
+	user_agent    string
+	stdin_bool    bool
+	pstdout       bool
+	ttsbool       bool
+	helpBool      bool
+	markdown_bool bool
+	command       string
+	configPath    string
 )
 
 func isFlagPassed(name string) bool {
@@ -188,6 +190,8 @@ func init() {
 	flag.StringVar(&command, "tts", "default", "command to use to play text with TTS")
 	flag.BoolVar(&ttsbool, "t", false, "Use default TTS command to play TTS")
 
+	flag.BoolVar(&markdown_bool, "m", false, "Convert HTML to markdown")
+
 	flag.BoolVar(&helpBool, "help", false, "Print help")
 	flag.BoolVar(&helpBool, "h", false, "Print help")
 
@@ -212,6 +216,15 @@ func parse_config2(cmd string) {
 	command = config.String(cmd)
 }
 
+func html2mdd(html string) string {
+	converter := md.NewConverter("", true, nil)
+	markdown, err := converter.ConvertString(html)
+	if err != nil {
+		fmt.Println(err)
+	}
+	return markdown
+}
+
 // TODO change url variable to something else to avoid net/url conflict
 func main() {
 	flag.Parse()
@@ -229,16 +242,29 @@ func main() {
 	}
 
 	if stdin_open == true && url == "" {
-		lines := parse_stdin()
-		text := strings.Join(lines, " ")
-		for x := range lines {
-			fmt.Fprintln(os.Stdout, lines[x])
+		// lines := parse_stdin()
+		var text string
+		if markdown_bool == true {
+			a := bufio.NewScanner(os.Stdin)
+			var input string
+			for a.Scan() {
+				input += a.Text()
+			}
+			output := html2mdd(input)
+			fmt.Println(output)
+		} else {
+			lines := parse_stdin()
+			text = strings.Join(lines, " ")
+			for x := range lines {
+				fmt.Fprintln(os.Stdout, lines[x])
+			}
 		}
 
 		if isFlagPassed("tts") || ttsbool == true {
 			c := command
 			if c == "" || c == "default" {
 				// sets global command as stdin::cmd
+				// use default
 				parse_config2("stdin::cmd")
 			} else {
 				parse_config2(command)
@@ -248,17 +274,17 @@ func main() {
 		os.Exit(0)
 	}
 
-	if url != "" {
-		lines := process_url(url)
-		if command != "" {
-			text := strings.Join(lines, " ")
-			startTTS(text, command)
-		}
-		os.Exit(0)
-	} else if url == "" && stdin_open == false && stdin_bool == false {
-		fmt.Println("Input url or pipe in HTML")
-		print_help()
-		os.Exit(1)
-	}
+	// if url != "" {
+	// 	lines := process_url(url)
+	// 	if command != "" {
+	// 		text := strings.Join(lines, " ")
+	// 		startTTS(text, command)
+	// 	}
+	// 	os.Exit(0)
+	// } else if url == "" && stdin_open == false && stdin_bool == false {
+	// 	fmt.Println("Input url or pipe in HTML")
+	// 	print_help()
+	// 	os.Exit(1)
+	// }
 
 }
